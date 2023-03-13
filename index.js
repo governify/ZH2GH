@@ -44,7 +44,7 @@ app.post('/', function (_req, _res) {
     getGithubProjectsV2OptionsId(owner, repo, issueNumber).then(res => {
         const projectsV2 = res.data?.data?.repository?.issue?.projectsV2?.nodes
         if (!projectsV2) _res.status(500).send(res.data)
-        if (projectsV2.length === 0) _res.status(500).send(`The issue with ID ${issueNumber} is not linked to any project.`)
+        else if (projectsV2.length === 0) _res.status(500).send(`The issue with ID ${issueNumber} is not linked to any project.`)
         
         for (let project of projectsV2) {
             const pipelineField = project.fields.nodes[2]
