@@ -36,37 +36,40 @@ const GITHUB_APIKEY = process.env.GITHUB_APIKEY
 app.post('/', function (_req, _res) {
   console.log("Received a request: ", _req.body)
   if (_req.body.type !== "issue_transfer") _res.status(200).send("Received an event of type '" + _req.body.type + "', not an 'issue_transfer' event. Ignoring...")
+  else {
+    const urlSplit = _req.body.github_url.split("/")
+    let owner = urlSplit[3]
+    let repo = urlSplit[4]
+    let issueNumber = urlSplit[6]
+  
+    getGithubProjectsV2OptionsId(owner, repo, issueNumber).then(res => {
+      const projectsV2 = res.data?.data?.repository?.issue?.projectsV2?.nodes
+      if (!projectsV2) _res.status(500).send(res.data)
+      else if (projectsV2.length === 0) _res.status(500).send(`The issue with ID ${issueNumber} is not linked to any project.`)
+      else {
+        for (let project of projectsV2) {
+          const pipelineField = project.fields.nodes[2]
+          const projectId = project?.id
+          const fieldId = pipelineField?.id
+          const optionId = pipelineField.options.find(option => option.name === _req.body.to_pipeline_name)?.id
+          const itemId = project.items.nodes.find(item => item.fieldValues.nodes.find(fieldValue => fieldValue.text === _req.body.issue_title))?.id
+    
+          updateGithubProjectsV2(projectId, itemId, fieldId, optionId).then(res => {
+            if (res.data?.errors?.find(error => error?.type === "NOT_FOUND")) _res.status(404).send(res.data)
+            else if (res.data?.errors) _res.status(500).send(res.data)
+            else _res.status(200).send(res.data)
+          }).catch(err => {
+            console.log("Error: ", err)
+            _res.status(500).send(err)
+          })
+        }
+      }
+    }).catch(err => {
+      console.log("Error: ", err)
+      _res.status(500).send(err)
+    })
+  }
 
-  const urlSplit = _req.body.github_url.split("/")
-  let owner = urlSplit[3]
-  let repo = urlSplit[4]
-  let issueNumber = urlSplit[6]
-
-  getGithubProjectsV2OptionsId(owner, repo, issueNumber).then(res => {
-    const projectsV2 = res.data?.data?.repository?.issue?.projectsV2?.nodes
-    if (!projectsV2) _res.status(500).send(res.data)
-    else if (projectsV2.length === 0) _res.status(500).send(`The issue with ID ${issueNumber} is not linked to any project.`)
-
-    for (let project of projectsV2) {
-      const pipelineField = project.fields.nodes[2]
-      const projectId = project?.id
-      const fieldId = pipelineField?.id
-      const optionId = pipelineField.options.find(option => option.name === _req.body.to_pipeline_name)?.id
-      const itemId = project.items.nodes.find(item => item.fieldValues.nodes.find(fieldValue => fieldValue.text === _req.body.issue_title))?.id
-
-      updateGithubProjectsV2(projectId, itemId, fieldId, optionId).then(res => {
-        if (res.data?.errors?.find(error => error?.type === "NOT_FOUND")) _res.status(404).send(res.data)
-        else if (res.data?.errors) _res.status(500).send(res.data)
-        else _res.status(200).send(res.data)
-      }).catch(err => {
-        console.log("Error: ", err)
-        _res.status(500).send(err)
-      })
-    }
-  }).catch(err => {
-    console.log("Error: ", err)
-    _res.status(500).send(err)
-  })
 })
 
 
