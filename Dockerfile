@@ -15,4 +15,4 @@ ARG PORT=80
 ENV PORT $PORT
 EXPOSE $PORT
 
-CMD [ "node", "index.js" ]
+CMD [ "node", "src/index.js" ]
