@@ -11,15 +11,38 @@ export default { processIssueTransfer, processIssueCreation }
  */
 async function processIssueTransfer(repository, to_pipeline_name, issueTitle) {
 
-  const filteredProjects = repository?.issue?.projectsV2?.nodes
-  if (!filteredProjects) throw new Error("Error getting projects")
-  if (filteredProjects.length === 0) {
-    const message = "Tried to tranfer an issue not linked to any project. Issue : " + repository.issue.title + " in repo: " + repository.name;
+  const projectsLinkedToIssue = repository?.issue?.projectsV2?.nodes ?? []
+  if (!projectsLinkedToIssue) throw new Error("Error getting projects")
+  const validProjectsLinkedToIssue = projectsLinkedToIssue.filter(project => _checkStatusOptions(project))
+
+  //If the issue is not linked to any project, repository projects will be checked to see if they are valid, if not a new project will be created
+  if (validProjectsLinkedToIssue.length === 0) {
+    const message = "Tried to tranfer an issue not linked to any project. Issue : " + repository.issue.title + " in repo: " + repository.name + ". The system will try to find a valid project or create a new one."
     AlertService.alert(message)
+
+    const projectsInRepo = repository?.projectsV2?.nodes
+    for (let project of projectsInRepo) {
+      if (_checkStatusOptions(project)) {
+        console.log("Valid project found in repo: ", repository.name, ". Linking issue to project: ", project.id)
+        project.issue = repository.issue;//Used in linkIssueToProjectV2 function
+        await GithubService.linkIssueToProjectV2(project)
+        validProjectsLinkedToIssue.push(project)
+      }
+    }
+    if (validProjectsLinkedToIssue.length === 0) {
+      console.log("No valid project found in repo: ", repository.name, ". Creating a new project...")
+      const newProject = await GithubService.copyTemplateProject(repository)//Is a valid project (hopefully :D)
+      console.log("New project created: ", newProject.id)
+      newProject.issue = repository.issue
+      await GithubService.linkProjectV2ToRepository(repository.id, newProject.id)
+      await GithubService.linkIssueToProjectV2(newProject)
+      validProjectsLinkedToIssue.push(newProject)
+    }
   }
 
-  for (let i = 0; i < filteredProjects.length; i++) {
-    _setFieldOption(filteredProjects[i], "Status", to_pipeline_name, issueTitle)
+  for (let i = 0; i < validProjectsLinkedToIssue.length; i++) {
+    // If the project does not have the status column with the to_pipeline_name option, the issue will not be updated in that project but continue with the next project
+    _setFieldOption(validProjectsLinkedToIssue[i], "Status", to_pipeline_name, issueTitle)
 
   }
   return { result: "Issue transfer processed" }
