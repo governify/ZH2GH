@@ -1,5 +1,7 @@
 import GithubService from '../services/GithubService.js';
 import { BLUEJAY_STATUS_OPTIONS_NAMES } from "../index.js";
+import logger from '../utils/logger.js';
+
 export default {
     validateNotEpicTag: validateNotEpicTag,
     validateZenHubDestinationPipeline: validateZenHubDestinationPipeline
@@ -12,18 +14,21 @@ export default {
  * @param {*} next 
  */
 function validateNotEpicTag(req, res, next) {
+    logger.debug("Validating if the issue is an epic with URL:", req.body.github_url);
     GithubService.isEpicIssue(req.body.github_url)
         .then(isEpic => {
             if (isEpic) {
-                console.log("The issue is an epic. Epic issues are ignored.")
-                res.status(200).send({ mesagge: "The issue is an epic. Epic issues are ignored." })
+                logger.info("The issue is an epic. Epic issues are ignored.");
+                res.status(200).send({ message: "The issue is an epic. Epic issues are ignored." });
             } else {
-                console.log("The issue is not an epic. Continue...")
-                console.log("Request body:", JSON.stringify(req.body, null, 2))
+                logger.info("The issue is not an epic. Proceeding to the next validation.");
                 next();
             }
         })
-        .catch(err => { res.status(500).send({ message: "Error: " + err }); console.log("Error validating: ", err) })
+        .catch(err => { 
+            res.status(500).send({ message: "Error: " + err });
+            logger.error("Error validating if the issue is an epic: ", err);
+        });
 }
 
 /**
@@ -35,14 +40,13 @@ function validateNotEpicTag(req, res, next) {
  * @param {*} next 
  */
 function validateZenHubDestinationPipeline(req, res, next) {
-    if (req.body.type == "issue_reprioritized") {//Issue creation
+    logger.debug("Validating destination pipeline:", req.body.to_pipeline_name);
+    if (req.body.type == "issue_reprioritized") {
         next();
     } else if (req.body.type == "issue_transfer" && BLUEJAY_STATUS_OPTIONS_NAMES.includes(req.body.to_pipeline_name)){
         next();
     } else {
-        console.log("The destination pipeline or the type is not allowed: ", req.body.to_pipeline_name + " .Aborting...")
-        res.status(400).send({ message: "The destination pipeline is not allowed." })
+        logger.warn("The destination pipeline or the type is not allowed: ", req.body.to_pipeline_name + ". Aborting...");
+        res.status(400).send({ message: "The destination pipeline is not allowed." });
     }
-
-
 }

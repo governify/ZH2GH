@@ -8,6 +8,7 @@ dotenv.config()
 import http from "http";
 import express from "express";
 import bodyParser from 'body-parser'
+import logger from './utils/logger.js';
 //------------------------------------------------------------------------------------------------
 export const BLUEJAY_STATUS_OPTIONS_NAMES = ["Todo", "In Progress","In Review", "Done"]
 export default {}
@@ -21,9 +22,10 @@ import BluejayValidator from './validators/BluejayValidator.js';
 
 //START THE SERVER--------------------------------------------------------------------------------
 http.createServer(app).listen(port, function () {
-  console.log("\nApp running at http://localhost:" + port);
-  console.log("When developing, to expose this server to the internet OPEN A NEW TERMINAL and run: \n>>> npm run tunnel")
-  console.log("________________________________________________________________");
+  logger.info(`Current log level: ${logger.currentLogLevel}`);
+  logger.info("App running at http://localhost:" + port);
+  logger.info("When developing, to expose this server to the internet OPEN A NEW TERMINAL and run: \n>>> npm run tunnel");
+  logger.info("________________________________________________________________");
 
 });
 
