@@ -1,9 +1,7 @@
-import dotenv from 'dotenv';
-dotenv.config();
 import axios from 'axios';
 import logger from '../utils/logger.js';
+import { getKey, keyServices } from '../utils/keyManager.js';
 
-const GITHUB_APIKEY = process.env.GITHUB_APIKEY;
 const API_URL = 'https://api.github.com';
 
 export default { isEpicIssue, getRepoData, updateProjectV2ItemFieldSingleSelectValue, copyTemplateProject, linkProjectV2ToRepository, linkIssueToProjectV2 };
@@ -274,6 +272,7 @@ function linkIssueToProjectV2(project) {
  * @returns {Promise<AxiosResponse<any>>} Axios response tranformed by the callback function.
  */
 function _fetchGithubGQL(query, resTrasformer) {
+  const GITHUB_APIKEY = getKey(keyServices.github);
   return new Promise((resolve, reject) => {
     axios.post(API_URL + '/graphql', { query: query }, { headers: { Authorization: 'Bearer ' + GITHUB_APIKEY, Accept: 'application/vnd.github.starfox-preview+json' } })
       .then(axiosResponse => {

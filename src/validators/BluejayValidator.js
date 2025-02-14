@@ -2,9 +2,19 @@ import GithubService from '../services/GithubService.js';
 import { BLUEJAY_STATUS_OPTIONS_NAMES } from "../index.js";
 import logger from '../utils/logger.js';
 
+const validateRequestBody = (req, res, next) => {
+    logger.debug("Validating request body:", req.body);
+    const { github_url, type } = req.body;
+    if (!github_url || !type) {
+        return res.status(400).json({ error: "Missing required fields: github_url, type" });
+    }
+    next();
+};
+
 export default {
     validateNotEpicTag: validateNotEpicTag,
-    validateZenHubDestinationPipeline: validateZenHubDestinationPipeline
+    validateZenHubDestinationPipeline: validateZenHubDestinationPipeline,
+    validateRequestBody: validateRequestBody
 };
 
 /**
@@ -25,7 +35,7 @@ function validateNotEpicTag(req, res, next) {
                 next();
             }
         })
-        .catch(err => { 
+        .catch(err => {
             res.status(500).send({ message: "Error: " + err });
             logger.error("Error validating if the issue is an epic: ", err);
         });
@@ -43,7 +53,7 @@ function validateZenHubDestinationPipeline(req, res, next) {
     logger.debug("Validating destination pipeline:", req.body.to_pipeline_name);
     if (req.body.type == "issue_reprioritized") {
         next();
-    } else if (req.body.type == "issue_transfer" && BLUEJAY_STATUS_OPTIONS_NAMES.includes(req.body.to_pipeline_name)){
+    } else if (req.body.type == "issue_transfer" && BLUEJAY_STATUS_OPTIONS_NAMES.includes(req.body.to_pipeline_name)) {
         next();
     } else {
         logger.warn("The destination pipeline or the type is not allowed: ", req.body.to_pipeline_name + ". Aborting...");

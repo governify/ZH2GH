@@ -34,6 +34,7 @@ http.createServer(app).listen(port, function () {
 
 app.post('/',
   //Validator middlewares
+  BluejayValidator.validateRequestBody, // New validator
   BluejayValidator.validateNotEpicTag,
   BluejayValidator.validateZenHubDestinationPipeline,
   //Controller
