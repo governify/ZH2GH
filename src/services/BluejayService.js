@@ -64,7 +64,7 @@ function _checkStatusOptions(project) {
         logger.info((valid ? "Valid" : "Invalid") + " options in project:", project.id);
         return valid;
     } catch (err) {
-        logger.error("Error checking status field:", err);
+        logger.error("Error checking status field:", err.message);
         return false;
     }
 }
@@ -77,12 +77,12 @@ async function _setFieldOption(project, fieldName, optionName, issueTitle) {
 
         const res = await GithubService.updateProjectV2ItemFieldSingleSelectValue(project?.id, item?.id, statusField?.id, option?.id);
         if (res.data?.errors) {
-            logger.error("Error updating project with id:", project.id, ":", res.data.errors);
+            logger.error("Error updating project with id:", project.id, ":", res.data?.errors?.map(error => error.message).join(", "));
         } else {
             logger.info("Project with id:", project.id, "has been updated");
         }
     } catch (err) {
-        logger.error("Error setting field option:", err);
+        logger.error("Error setting field option:", err.message);
         return null;
     }
 }

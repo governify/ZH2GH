@@ -37,7 +37,7 @@ function validateNotEpicTag(req, res, next) {
         })
         .catch(err => {
             res.status(500).send({ message: "Error: " + err });
-            logger.error("Error validating if the issue is an epic: ", err);
+            logger.error("Error validating if the issue is an epic: ", err.message);
         });
 }
 

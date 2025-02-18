@@ -282,8 +282,8 @@ function _fetchGithubGQL(query, resTrasformer) {
         resolve(result);
       })
       .catch(err => {
-        logger.error("Error fetching GitHub GQL: ", err);
-        reject(err);
+        logger.error("Error fetching GitHub GQL: ", err.message);
+        reject(new Error("Error fetching GitHub GQL: " + err.message));
       });
   });
 }

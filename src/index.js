@@ -9,6 +9,7 @@ import http from "http";
 import express from "express";
 import bodyParser from 'body-parser'
 import logger from './utils/logger.js';
+import { transactionMiddleware } from './middleware/transactionMiddleware.js';
 //------------------------------------------------------------------------------------------------
 export const BLUEJAY_STATUS_OPTIONS_NAMES = ["Todo", "In Progress","In Review", "Done"]
 export default {}
@@ -33,6 +34,8 @@ http.createServer(app).listen(port, function () {
 //app.HTTP_TYPE(path, middleware1, middleware2, ..., middlewareN, controller)
 
 app.post('/',
+  // This middelware is used to log the messages related to this request with a unique transaction id
+  transactionMiddleware,
   //Validator middlewares
   BluejayValidator.validateRequestBody, // New validator
   BluejayValidator.validateZenHubDestinationPipeline,

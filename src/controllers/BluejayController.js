@@ -9,8 +9,14 @@ import logger from '../utils/logger.js';
  * @param {Object} res - The Express response object.
  */
 async function POST_default(req, res) {
-    const repository = await GithubService.getRepoData(req.body.github_url);
     if (req.body.type === "issue_transfer") {
+        let repository;
+        try {
+            repository = await GithubService.getRepoData(req.body.github_url);
+        } catch (err) {
+            logger.error("Error fetching repository data:", err.message);
+            return res.status(500).send({ message: "Failed to fetch repository data." });
+        }
         logger.info("Processing issue transfer for issue:", req.body.issue_title);
         BluejayService.processIssueTransfer(repository, req.body.to_pipeline_name, req.body.issue_title)
             .then(result => {
@@ -18,8 +24,8 @@ async function POST_default(req, res) {
                 logger.info("Issue transfer processed successfully:", result);
             })
             .catch(err => {
-                res.status(err.status || 500).send(err);
-                logger.error("Error processing issue transfer:", err);
+                res.status(err.status || 500).send(err.message);
+                logger.error("Error processing issue transfer:", err.message);
             });
     } else {
         const message = "The type of the request is not supported: " + req.body.type;

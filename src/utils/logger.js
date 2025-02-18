@@ -1,15 +1,17 @@
 import dotenv from 'dotenv';
+import { getTransactionId } from '../asyncLoggerContext.js';
+
 dotenv.config();
 
 const LOG_LEVELS = ['DEBUG', 'INFO', 'WARN', 'ERROR', 'NONE'];
 const currentLogLevel = (process.env.ZH2GH_LOG_LEVEL || 'INFO').toUpperCase();
 
-
-
 function log(level, ...messages) {
     if (LOG_LEVELS.indexOf(level) >= LOG_LEVELS.indexOf(currentLogLevel)) {
         const timestamp = new Date().toISOString();
-        console.log(`${timestamp} [${level}]:`, ...messages);
+        const transactionId = getTransactionId() || 'N/A';
+        const shortTransactionId = transactionId.split('-')[0];
+        console.log(`${timestamp} [${level}] [${shortTransactionId}]:`, ...messages);
     }
 }
 
