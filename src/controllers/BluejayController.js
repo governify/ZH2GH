@@ -10,18 +10,7 @@ import logger from '../utils/logger.js';
  */
 async function POST_default(req, res) {
     const repository = await GithubService.getRepoData(req.body.github_url);
-    if (req.body.type === "issue_reprioritized" || (req.body.from_pipeline_name === "New Issues" && req.body.to_pipeline_name === "Todo")) {
-        logger.info("Processing issue creation for issue:", req.body.issue_title);
-        BluejayService.processIssueCreation(repository, "Todo", req.body.issue_title)
-            .then(result => {
-                res.status(200).send(result);
-                logger.info("Issue creation processed successfully:", result);
-            })
-            .catch(err => {
-                res.status(err.status || 500).send(err);
-                logger.error("Error processing issue creation:", err);
-            });
-    } else if (req.body.type === "issue_transfer") {
+    if (req.body.type === "issue_transfer") {
         logger.info("Processing issue transfer for issue:", req.body.issue_title);
         BluejayService.processIssueTransfer(repository, req.body.to_pipeline_name, req.body.issue_title)
             .then(result => {

@@ -2,7 +2,7 @@ import GithubService from "./GithubService.js";
 import { BLUEJAY_STATUS_OPTIONS_NAMES } from "../index.js";
 import logger from '../utils/logger.js';
 
-export default { processIssueTransfer, processIssueCreation };
+export default { processIssueTransfer };
 
 /**
  * Tries to copy the issue transfer to all GitHub projects containing the issue.
@@ -47,37 +47,12 @@ async function processIssueTransfer(repository, to_pipeline_name, issueTitle) {
 }
 
 /**
- * Creates a project if the issue is not linked to any project with the status options required by Bluejay.
- * @param {*} body 
- * @returns 
+ * Checks if the project has the required options in the "Status" field.
+ * A status option is each of the selectable values in the field "Status" of the project.
+ * Normally, these values are "Todo", "In Progress", "In Review", "Done".
+ * @param {*} project - The project to check.
+ * @returns {boolean} - True if the project has at least ALL the required status options.
  */
-async function processIssueCreation(repository, to_pipeline_name = "Todo", issueTitle) {
-    logger.debug("Processing issue transfer for repository:", repository?.name);
-    const projects = repository?.projectsV2?.nodes;
-
-    let numberOfProjectsUpdated = 0;
-    for (let project of projects) {
-        if (_checkStatusOptions(project)) { //Valid project
-            project.issue = repository.issue;
-            await GithubService.linkIssueToProjectV2(project);
-            await _setFieldOption(project, "Status", to_pipeline_name, issueTitle);
-            numberOfProjectsUpdated++;
-        }
-    }
-
-    if (numberOfProjectsUpdated === 0) {
-        //creates a new project
-        const newProject = await GithubService.copyTemplateProject(repository);//Is a valid project (hopefully :D)
-        newProject.issue = repository.issue;
-        await GithubService.linkProjectV2ToRepository(repository.id, newProject.id);
-        await GithubService.linkIssueToProjectV2(newProject);
-        await _setFieldOption(newProject, "Status", to_pipeline_name, issueTitle);
-        logger.info("No valid project found in repo:", repository.name);
-        logger.info("New project created:", newProject.id);
-    }
-    return { result: "Issue creation processed" };
-}
-
 function _checkStatusOptions(project) {
     try {
         let valid = true;

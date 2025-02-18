@@ -4,9 +4,9 @@ import logger from '../utils/logger.js';
 
 const validateRequestBody = (req, res, next) => {
     logger.debug("Validating request body:", req.body);
-    const { github_url, type } = req.body;
-    if (!github_url || !type) {
-        return res.status(400).json({ error: "Missing required fields: github_url, type" });
+    const { github_url, type, to_pipeline_name } = req.body;
+    if (!github_url || !type || !to_pipeline_name) {
+        return res.status(400).json({ error: "Missing required fields: github_url, type, to_pipeline_name" });
     }
     next();
 };
@@ -51,9 +51,7 @@ function validateNotEpicTag(req, res, next) {
  */
 function validateZenHubDestinationPipeline(req, res, next) {
     logger.debug("Validating destination pipeline:", req.body.to_pipeline_name);
-    if (req.body.type == "issue_reprioritized") {
-        next();
-    } else if (req.body.type == "issue_transfer" && BLUEJAY_STATUS_OPTIONS_NAMES.includes(req.body.to_pipeline_name)) {
+    if (req.body.type == "issue_transfer" && BLUEJAY_STATUS_OPTIONS_NAMES.includes(req.body.to_pipeline_name)) {
         next();
     } else {
         logger.warn("The destination pipeline or the type is not allowed: ", req.body.to_pipeline_name + ". Aborting...");
