@@ -62,8 +62,7 @@ jobs:
           destination_branch: "develop"
           pr_title: "Synchronize develop with master after release ${{ steps.changelog.outputs.tag }}"
           pr_body: ":crown:"
-          pr_reviewer: "pafmon"
-          pr_assignee: "cesgarpas"
+          pr_assignee: "motero2k"
           pr_label: "auto-pr"                              
           github_token: ${{ secrets.GITHUB_TOKEN }}
       - uses: AutoModality/action-clean@v1

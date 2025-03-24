@@ -13,10 +13,17 @@ async function POST_default(req, res) {
         let repository;
         try {
             repository = await GithubService.getRepoData(req.body.github_url);
+            
         } catch (err) {
             logger.error("Error fetching repository data:", err.message);
             return res.status(500).send({ message: "Failed to fetch repository data." });
         }
+        if (!repository.issue) {
+            const message = "Repository issue is null. It might be a draft or a pull request.";
+            logger.warn(message);
+            return res.status(400).send({ message });
+        }
+
         logger.info("Processing issue transfer for issue:", req.body.issue_title);
         BluejayService.processIssueTransfer(repository, req.body.to_pipeline_name, req.body.issue_title)
             .then(result => {

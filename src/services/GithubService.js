@@ -12,9 +12,9 @@ export default { isEpicIssue, getRepoData, updateProjectV2ItemFieldSingleSelectV
  * @returns {Promise<boolean>}
  */
 function isEpicIssue(github_url) {
-    logger.debug("Checking if the issue is an epic with URL:", github_url);
-    const [, , , owner, repo, , issueNumber] = github_url.split("/");
-    const query = `{
+  logger.debug("Checking if the issue is an epic with URL:", github_url);
+  const [, , , owner, repo, , issueNumber] = github_url.split("/");
+  const query = `{
         repository(owner: "${owner}", name: "${repo}") {
             issue(number: ${issueNumber}) {
               number
@@ -26,12 +26,12 @@ function isEpicIssue(github_url) {
             }
         }    
     }`;
-    const callback = (axiosResponse) => { 
-        const isEpic = axiosResponse.data?.data?.repository?.issue?.labels?.nodes?.filter(label => label.name === "Epic").length > 0;
-        logger.debug("Epic check result for issue:", isEpic);
-        return isEpic;
-    };
-    return _fetchGithubGQL(query, callback);
+  const callback = (axiosResponse) => {
+    const isEpic = axiosResponse.data?.data?.repository?.issue?.labels?.nodes?.filter(label => label.name === "Epic").length > 0;
+    logger.debug("Epic check result for issue:", isEpic);
+    return isEpic;
+  };
+  return _fetchGithubGQL(query, callback);
 }
 
 /**
@@ -39,95 +39,174 @@ function isEpicIssue(github_url) {
  * @param {string} github_url - GitHub issue URL. (e.g., https://github.com/gii-is-psg2/bluejay-psg2-23-24/issues/12)
  * @returns {Promise<Array<Object>>} Repo information (see query below)
  */
-function getRepoData(github_url) {
+async function getRepoData(github_url) {
   logger.debug("Fetching repository data for URL:", github_url);
   const [, , , owner, repo, , issueNumber] = github_url.split("/");
 
   const query = `{
-                repository(owner: "${owner}", name: "${repo}") {
+    repository(owner: "${owner}", name: "${repo}") {
+      id
+      name
+      owner {
+        id
+      }
+      projectsV2(first: 5) {
+        nodes {
+          id
+          fields(first: 100) {
+            nodes {
+              ... on ProjectV2SingleSelectField {
+                id
+                name
+                options {
                   id
                   name
-                  owner{
-                    id
+                }
+              }
+            }
+          }
+          items(first: 100) {
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+            nodes {
+              id
+              fieldValues(first: 100) {
+                nodes {
+                  ... on ProjectV2ItemFieldTextValue {
+                    text
                   }
-                  projectsV2(first:5){
-                    nodes{
-                      id
-                      items(first: 100) {
-                        nodes {
-                          id
-                          fieldValues(first: 100) {
-                            nodes {
-                              ... on ProjectV2ItemFieldTextValue {
-                                text
-                              }
-                              ... on ProjectV2ItemFieldSingleSelectValue {
-                                name
-                                optionId
-                              }
-                            }
-                          }
-                        }
-                      }
-                      fields(first: 100) {
-                        nodes {
-                          ... on ProjectV2SingleSelectField {
-                            id
-                            name
-                            options {
-                              id
-                              name
-                            }
-                          }
-                        }
-                      }
+                  ... on ProjectV2ItemFieldSingleSelectValue {
+                    name
+                    optionId
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      issue(number: ${issueNumber}) {
+        number
+        id
+        title
+        projectsV2(first: 5) {
+          nodes {
+            id
+            fields(first: 100) {
+              nodes {
+                ... on ProjectV2SingleSelectField {
+                  id
+                  name
+                  options {
+                    id
+                    name
+                  }
+                }
+              }
+            }
+            items(first: 100) {
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+              nodes {
+                id
+                fieldValues(first: 100) {
+                  nodes {
+                    ... on ProjectV2ItemFieldTextValue {
+                      text
                     }
-                  }
-                  issue(number: ${issueNumber}) {
-                    number
-                    id
-                    title
-                    projectsV2(first: 5) {
-                      nodes {
-                        id
-                        fields(first: 100) {
-                          nodes {
-                            ... on ProjectV2SingleSelectField {
-                              id
-                              name
-                              options {
-                                id
-                                name
-                              }
-                            }
-                          }
-                        }
-                        items(first: 100) {
-                            nodes {
-                              id
-                              fieldValues(first: 100) {
-                                nodes {
-                                  ... on ProjectV2ItemFieldTextValue {
-                                    text
-                                  }
-                                  ... on ProjectV2ItemFieldSingleSelectValue {
-                                    name
-                                    optionId
-                                  }
-                                }
-                              }
-                            }
-                          }
-                      }
+                    ... on ProjectV2ItemFieldSingleSelectValue {
+                      name
+                      optionId
                     }
                   }
                 }
-              }`;
-  const callback = (axiosResponse) => { 
-    logger.debug("Repository data fetched");
-    return axiosResponse.data.data.repository;
+              }
+            }
+          }
+        }
+      }
+    }
+  }`;
+
+  const callback = async (axiosResponse) => {
+    const repository = axiosResponse.data.data.repository;
+
+    const repoProjects = repository?.projectsV2?.nodes || [];
+    const issueProjects = repository?.issue?.projectsV2?.nodes || [];
+
+    // Paginate items for each project in repository.projectsV2
+    for (const project of repoProjects) {
+      project.items.nodes = await _fetchAllItems(project.id, project.items.nodes, project.items.pageInfo);
+    }
+
+    // Paginate items for each project in repository.issue.projectsV2
+    for (const project of issueProjects) {
+      project.items.nodes = await _fetchAllItems(project.id, project.items.nodes, project.items.pageInfo);
+    }
+
+    logger.debug("Repository data fetched with all paginated items");
+    return repository;
   };
+
   return _fetchGithubGQL(query, callback);
+}
+
+/**
+ * Fetches all items for a project using pagination.
+ * @param {string} projectId - The ID of the project.
+ * @param {Array} existingItems - The already fetched items.
+ * @param {Object} pageInfo - The pagination info from the initial query.
+ * @returns {Promise<Array>} - A promise resolving to the complete list of items.
+ */
+async function _fetchAllItems(projectId, existingItems, pageInfo) {
+  let items = [...existingItems];
+  let cursor = pageInfo.endCursor;
+
+  while (pageInfo.hasNextPage) {
+    logger.debug(`More items to fetch for project: ${projectId}, retrieving next page...`);
+    const query = `{
+      node(id: "${projectId}") {
+        ... on ProjectV2 {
+          items(first: 100, after: "${cursor}") {
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+            nodes {
+              id
+              fieldValues(first: 100) {
+                nodes {
+                  ... on ProjectV2ItemFieldTextValue {
+                    text
+                  }
+                  ... on ProjectV2ItemFieldSingleSelectValue {
+                    name
+                    optionId
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }`;
+
+    const callback = (axiosResponse) => {
+      const newItems = axiosResponse.data.data.node.items.nodes;
+      pageInfo = axiosResponse.data.data.node.items.pageInfo;
+      cursor = pageInfo.endCursor;
+      return newItems;
+    };
+
+    const newItems = await _fetchGithubGQL(query, callback);
+    items = items.concat(newItems);
+  }
+
+  return items;
 }
 
 /**
@@ -155,7 +234,7 @@ function updateProjectV2ItemFieldSingleSelectValue(projectId, itemId, fieldId, o
                   }
                 }
               }`;
-  const callback = (axiosResponse) => { 
+  const callback = (axiosResponse) => {
     logger.debug("Project item field value updated:", axiosResponse.data);
     return axiosResponse;
   };
@@ -170,8 +249,8 @@ function updateProjectV2ItemFieldSingleSelectValue(projectId, itemId, fieldId, o
 function copyTemplateProject(repository) {
   logger.debug("Copying template project for repository:", repository?.name);
   const templateProjectId = "PVT_kwDOAtNQmc4Abbo8";
-  const query = 
-  `mutation copyProjectV2{
+  const query =
+    `mutation copyProjectV2{
     copyProjectV2(
       input: {title: "${repository.name}",projectId: "${templateProjectId}",ownerId: "${repository.owner.id}"
    }) {
@@ -208,7 +287,7 @@ function copyTemplateProject(repository) {
     }
   }
 }`;
-  const callback = (axiosResponse) => { 
+  const callback = (axiosResponse) => {
     logger.debug("Template project copied:", axiosResponse.data.data.copyProjectV2.projectV2);
     return axiosResponse.data.data.copyProjectV2.projectV2;
   };
@@ -217,8 +296,8 @@ function copyTemplateProject(repository) {
 
 function linkProjectV2ToRepository(repositoryId, projectId) {
   logger.debug(`Linking project to repository: repositoryId=${repositoryId}, projectId=${projectId}`);
-  const query = 
-  `
+  const query =
+    `
   mutation {
     linkProjectV2ToRepository(
       input: {repositoryId: "${repositoryId}", projectId: "${projectId}"}
@@ -229,7 +308,7 @@ function linkProjectV2ToRepository(repositoryId, projectId) {
     }
   }
   `;
-  const callback = (axiosResponse) => { 
+  const callback = (axiosResponse) => {
     logger.debug("Project linked to repository:", axiosResponse.data);
     return axiosResponse;
   };
@@ -250,11 +329,11 @@ function linkIssueToProjectV2(project) {
         }
       }
     }`;
-  const callback = (axiosResponse) => { 
+  const callback = (axiosResponse) => {
     const item = {
       id: axiosResponse.data.data.addProjectV2ItemById.item.id,
       fieldValues: {
-        nodes:[{text: project.issue.title}]
+        nodes: [{ text: project.issue.title }]
       }
     };
     project.items.nodes.push(item);
