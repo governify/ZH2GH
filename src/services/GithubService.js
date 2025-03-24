@@ -1,11 +1,10 @@
-import dotenv from 'dotenv'
-dotenv.config()
-import axios from 'axios'
+import axios from 'axios';
+import logger from '../utils/logger.js';
+import { getKey, keyServices } from '../utils/keyManager.js';
 
-const GITHUB_APIKEY = process.env.GITHUB_APIKEY
 const API_URL = 'https://api.github.com';
 
-export default { isEpicIssue, getRepoData, updateProjectV2ItemFieldSingleSelectValue, copyTemplateProject, linkProjectV2ToRepository, linkIssueToProjectV2 }
+export default { isEpicIssue, getRepoData, updateProjectV2ItemFieldSingleSelectValue, copyTemplateProject, linkProjectV2ToRepository, linkIssueToProjectV2 };
 
 /**
  * Checks if the issue is an epic. Epic issues are not processed by Bluejay.
@@ -13,8 +12,9 @@ export default { isEpicIssue, getRepoData, updateProjectV2ItemFieldSingleSelectV
  * @returns {Promise<boolean>}
  */
 function isEpicIssue(github_url) {
-  const [, , , owner, repo, , issueNumber] = github_url.split("/")
-  const query = `{
+    logger.debug("Checking if the issue is an epic with URL:", github_url);
+    const [, , , owner, repo, , issueNumber] = github_url.split("/");
+    const query = `{
         repository(owner: "${owner}", name: "${repo}") {
             issue(number: ${issueNumber}) {
               number
@@ -25,9 +25,13 @@ function isEpicIssue(github_url) {
               }
             }
         }    
-    }`
-  const callback = (axiosResponse) => { return axiosResponse.data?.data?.repository?.issue?.labels?.nodes?.filter(label => label.name === "Epic").length > 0 }
-  return _fetchGithubGQL(query, callback)
+    }`;
+    const callback = (axiosResponse) => { 
+        const isEpic = axiosResponse.data?.data?.repository?.issue?.labels?.nodes?.filter(label => label.name === "Epic").length > 0;
+        logger.debug("Epic check result for issue:", isEpic);
+        return isEpic;
+    };
+    return _fetchGithubGQL(query, callback);
 }
 
 /**
@@ -36,7 +40,8 @@ function isEpicIssue(github_url) {
  * @returns {Promise<Array<Object>>} Repo information (see query below)
  */
 function getRepoData(github_url) {
-  const [, , , owner, repo, , issueNumber] = github_url.split("/")
+  logger.debug("Fetching repository data for URL:", github_url);
+  const [, , , owner, repo, , issueNumber] = github_url.split("/");
 
   const query = `{
                 repository(owner: "${owner}", name: "${repo}") {
@@ -117,9 +122,12 @@ function getRepoData(github_url) {
                     }
                   }
                 }
-              }`
-  const callback = (axiosResponse) => { return axiosResponse.data.data.repository }
-  return _fetchGithubGQL(query, callback)
+              }`;
+  const callback = (axiosResponse) => { 
+    logger.debug("Repository data fetched");
+    return axiosResponse.data.data.repository;
+  };
+  return _fetchGithubGQL(query, callback);
 }
 
 /**
@@ -131,6 +139,7 @@ function getRepoData(github_url) {
  * @returns {Promise<AxiosResponse<any>>} Axios response with the result of the operation.
  */
 function updateProjectV2ItemFieldSingleSelectValue(projectId, itemId, fieldId, optionId) {
+  logger.debug(`Updating project item field value: projectId=${projectId}, itemId=${itemId}, fieldId=${fieldId}, optionId=${optionId}`);
   const query = `mutation {
                 updateProjectV2ItemFieldValue(
                   input: {projectId: "${projectId}", itemId: "${itemId}", fieldId: "${fieldId}", value: {singleSelectOptionId: "${optionId}"}}
@@ -145,29 +154,22 @@ function updateProjectV2ItemFieldSingleSelectValue(projectId, itemId, fieldId, o
                     }
                   }
                 }
-              }`
-  const callback = (axiosResponse) => { return axiosResponse }//not used
-  return _fetchGithubGQL(query, callback)
+              }`;
+  const callback = (axiosResponse) => { 
+    logger.debug("Project item field value updated:", axiosResponse.data);
+    return axiosResponse;
+  };
+  return _fetchGithubGQL(query, callback);
 }
+
 /**
  * Creates a new project from the bluejay template at gii-is-psg2.
  * @param {} github_url 
  * @returns id of the project created
  */
 function copyTemplateProject(repository) {
-  /* id of the Bluejay template project at gii-is-psg2. Obtained using:
-  query {
-  organization(login: "gii-is-psg2"){
-    projectsV2(first:5){
-      nodes{
-        title
-        id
-      }
-    }
-  }
-  }
-  */
-  const templateProjectId = "PVT_kwDOAtNQmc4Abbo8"
+  logger.debug("Copying template project for repository:", repository?.name);
+  const templateProjectId = "PVT_kwDOAtNQmc4Abbo8";
   const query = 
   `mutation copyProjectV2{
     copyProjectV2(
@@ -205,12 +207,16 @@ function copyTemplateProject(repository) {
  			}
     }
   }
-}`
-  const callback = (axiosResponse) => { return axiosResponse.data.data.copyProjectV2.projectV2 }
-  return _fetchGithubGQL(query, callback)
+}`;
+  const callback = (axiosResponse) => { 
+    logger.debug("Template project copied:", axiosResponse.data.data.copyProjectV2.projectV2);
+    return axiosResponse.data.data.copyProjectV2.projectV2;
+  };
+  return _fetchGithubGQL(query, callback);
 }
 
 function linkProjectV2ToRepository(repositoryId, projectId) {
+  logger.debug(`Linking project to repository: repositoryId=${repositoryId}, projectId=${projectId}`);
   const query = 
   `
   mutation {
@@ -222,37 +228,41 @@ function linkProjectV2ToRepository(repositoryId, projectId) {
       }
     }
   }
-  `
-  const callback = (axiosResponse) => { return axiosResponse } //not used
-  return _fetchGithubGQL(query, callback)
+  `;
+  const callback = (axiosResponse) => { 
+    logger.debug("Project linked to repository:", axiosResponse.data);
+    return axiosResponse;
+  };
+  return _fetchGithubGQL(query, callback);
 }
+
 /**
  * Links an issue to a project. The issue is added as a card to the project.
  * @param {Object} project ```{id,issue:{id,title},items:{nodes:[{id,fieldValues:{nodes:[{text}]}}]}```
  * @returns 
  */
-
 function linkIssueToProjectV2(project) {
+  logger.debug("Linking issue to project:", project.id);
   const query = `mutation linkIssueToProjectV2{
       addProjectV2ItemById(input: {projectId: "${project.id}" contentId: "${project.issue.id}"}) {
         item {
           id
         }
       }
-    }`
+    }`;
   const callback = (axiosResponse) => { 
     const item = {
       id: axiosResponse.data.data.addProjectV2ItemById.item.id,
       fieldValues: {
         nodes:[{text: project.issue.title}]
       }
-    }
-    project.items.nodes.push(item)
-    return axiosResponse.data.data.addProjectV2ItemById.item.id
-  }
-  return _fetchGithubGQL(query, callback)
+    };
+    project.items.nodes.push(item);
+    logger.debug("Issue linked to project:", item);
+    return axiosResponse.data.data.addProjectV2ItemById.item.id;
+  };
+  return _fetchGithubGQL(query, callback);
 }
-
 
 //PRIVATE FUNCTIONS-------------------------------------------------------------------------------------
 /**
@@ -262,15 +272,18 @@ function linkIssueToProjectV2(project) {
  * @returns {Promise<AxiosResponse<any>>} Axios response tranformed by the callback function.
  */
 function _fetchGithubGQL(query, resTrasformer) {
+  const GITHUB_APIKEY = getKey(keyServices.github);
   return new Promise((resolve, reject) => {
     axios.post(API_URL + '/graphql', { query: query }, { headers: { Authorization: 'Bearer ' + GITHUB_APIKEY, Accept: 'application/vnd.github.starfox-preview+json' } })
       .then(axiosResponse => {
-        // console.log("Query sent: ", query)
-        // console.log("Fetched response.data: ", JSON.stringify(axiosResponse.data, null, 2))
-        const result = resTrasformer(axiosResponse)
-        resolve(result)
 
+        logger.debug("Github Fetch was successful");
+        const result = resTrasformer(axiosResponse);
+        resolve(result);
       })
-      .catch(err => reject(err));
+      .catch(err => {
+        logger.error("Error fetching GitHub GQL: ", err.message);
+        reject(new Error("Error fetching GitHub GQL: " + err.message));
+      });
   });
 }
